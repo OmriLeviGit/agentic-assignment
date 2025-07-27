@@ -1,0 +1,15 @@
+approach and design:
+
+the most naive one is to give the entire grid to the llm and attempt to let it decide directly
+
+- maybe give the llm only options that can reach the goal if it takes them
+- do i want to use A-star here?
+- the llm need to make a request every step, not every
+
+
+get all possible reward locations, their distance from the goal and the distance to them
+
+
+
+questions:
+    does the agent not have access to the number of steps by design?
