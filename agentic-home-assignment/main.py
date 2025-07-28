@@ -12,7 +12,7 @@ import time
 from typing import Dict, Any, Optional, Union
 from src.simulation.simulator import get_simulator_by_difficulty, Simulator
 from src.agent.simple_agent import SimpleAgent
-from src.agent.gemini_agent import LLMAgent
+from src.agent.llm_agent import LLMAgent
 
 
 def get_difficulty_info() -> Dict[str, Dict[str, Union[str, int]]]:
@@ -65,7 +65,7 @@ def select_difficulty() -> Optional[str]:
     
     while True:
         # choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
-        choice = 'm'
+        choice = 'h'
         if choice == 'q':
             return None
         elif choice == 'e':
