@@ -100,8 +100,8 @@ def run_demo() -> None:
     simulator.setup_world()
     
     # Create simple agent
-    # agent: SimpleAgent = SimpleAgent("Simple Rule-Based Agent")
-    agent: LLMAgent = LLMAgent("Simple Rule-Based Agent")
+    agent: SimpleAgent = SimpleAgent("Simple Rule-Based Agent")
+    # agent: LLMAgent = LLMAgent("Simple Rule-Based Agent")
 
     print(f"\n🤖 Running with: {agent.name}")
     print(f"🎯 Difficulty: {difficulty_info['name']}")
@@ -112,7 +112,7 @@ def run_demo() -> None:
     # Run simulation
     result: Dict[str, Any] = simulator.run_simulation(
         agent=agent,
-        delay=1,  # Standard delay
+        # delay=0.5,  # Standard delay
         clear_screen=True,
         verbose=True
     )
