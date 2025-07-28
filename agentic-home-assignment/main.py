@@ -112,7 +112,7 @@ def run_demo() -> None:
     # Run simulation
     result: Dict[str, Any] = simulator.run_simulation(
         agent=agent,
-        delay=1.5,  # Standard delay
+        delay=1,  # Standard delay
         clear_screen=True,
         verbose=True
     )
