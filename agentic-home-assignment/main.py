@@ -12,7 +12,7 @@ import time
 from typing import Dict, Any, Optional, Union
 from src.simulation.simulator import get_simulator_by_difficulty, Simulator
 from src.agent.simple_agent import SimpleAgent
-from src.agent.llm_agent import LLMAgent
+from src.agent.gemini_agent import LLMAgent
 
 
 def get_difficulty_info() -> Dict[str, Dict[str, Union[str, int]]]:

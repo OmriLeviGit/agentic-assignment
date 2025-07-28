@@ -1,18 +1,21 @@
 import re
 from typing import Tuple, List, Optional, Dict, Any
+import requests
+from requests.models import Response
+
 from .simple_agent import SimpleAgent
 import google.generativeai as genai
 
+# A free test key with very restricting rate limits, would NEVER be here under normal circumstances
+API_KEY = "AIzaSyBd5H8RN16q0_i9eOMMOzGgbZBbVAK1FtU"
+genai.configure(api_key=API_KEY)
 
 class LLMAgent(SimpleAgent):
     def __init__(self, name: str = "LLMAgent"):
         super().__init__(name)
 
         self.ollama_url = "http://localhost:11434/api/generate"
-        self.key = "AIzaSyBd5H8RN16q0_i9eOMMOzGgbZBbVAK1FtU"
-
-        genai.configure(api_key="AIzaSyBd5H8RN16q0_i9eOMMOzGgbZBbVAK1FtU")
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')  # Gemini model
 
     def decide_move(self, possible_moves: List[Tuple[int, int]], grid_info: Dict[str, Any]) -> Optional[Tuple[int, int]]:
 
@@ -23,9 +26,14 @@ class LLMAgent(SimpleAgent):
 
         try:
             response: str = self._query_llm(prompt)
-            best_move_index: int = self._parse_llm_response(response)
+            print(response)
+            best_move_index = self._parse_llm_response(response)
 
-            return possible_moves[best_move_index]
+            for pm in possible_moves:
+                if str(pm) == best_move_index:
+                    return pm
+
+            raise ValueError("outside")
 
         except Exception as e:
             print(f"❌ LLM Error: {e}")
@@ -46,39 +54,48 @@ class LLMAgent(SimpleAgent):
             # 1-index the moves
             moves_str += f"{i + 1}. Move to {move}\n"
 
-        prompt = f"""MISSION: Maximize score = Goal Bonus + Number of Collected Items + Full Collection Bonus + Efficiency bonus
-        
-STATUS:
-- Position: {agent_pos} | Goal: {goal_pos}
-- Items: {items}/{items_total}
-- Obstacles: {obstacles}
+        prompt = f"""Instructions:
+You are playing a grid game in turns. Each turn you can move to a neighboring cell.
+GOAL: Get the highest score by collecting items and reaching the goal efficiently. Choose the best move.
 
-POSSIBLE MOVES:
-{moves_str}
+CURRENT STATE:
+- You are at: {agent_pos}
+- you can only move to the following positions: {possible_moves}
+- You want to reach to the Goal at: {goal_pos}
+- Items collected: {items_collected}/{items_total}
+- Obstacles to avoid: {obstacles}
 
-STRATEGY: Consider all factors - item collection efficiency, path to goal, obstacle avoidance.
-Your objective should be to collect all items, but do take note that long corridors that require backtracking may not be as efficient
-
-Return your choice in xml tags: <move>NUMBER</move>"""
+Respond with the best move"""
 
         return prompt
 
     def _query_llm(self, prompt: str) -> str:
         """Query Ollama API exactly like the README example."""
+        payload = {
+            "model": "tinyllama",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                # "num_predict": 100,  # Very short response
+                # "temperature": 0,  # Low randomness
+                # "top_k": 0.3,  # Focused sampling
+                # "stop": ["\n", "."]  # Stop at common delimiters
+            }
+        }
 
-        response = self.model.generate_content(prompt)
-        response_text = response.candidates[0].content.parts[0].text
+        response = requests.post(self.ollama_url, json=payload)
+        response.raise_for_status()
 
-        return response_text
+        return response.json()['response']
 
-    def _parse_llm_response(self, response_text) -> int:
+    def _parse_llm_response(self, response_text):
         """Extract move number from <move>NUMBER</move> tags."""
         # Look for <move>NUMBER</move> pattern
-        move_match = re.search(r'<move>(\d+)</move>', response_text, re.IGNORECASE)
+        move_match = re.search(r'\(\d+,\s*\d+\)', response_text, re.IGNORECASE)
         if move_match:
             try:
-                move_num = int(move_match.group(1))
-                return move_num - 1  # Convert to 0-indexed
+                move_num = move_match.group(0)
+                return move_num
             except ValueError:
                 raise ValueError(f"Invalid move number format: {move_match.group(1)}")
 
