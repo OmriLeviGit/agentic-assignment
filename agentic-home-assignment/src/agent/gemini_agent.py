@@ -11,8 +11,8 @@ class LLMAgent(SimpleAgent):
     def __init__(self, name: str = "LLMAgent"):
         super().__init__(name)
 
-        self.ollama_url = "http://localhost:11434/api/generate"
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')  # Gemini model
+        self.path = []    # All positions the agent had visited
 
     def decide_move(self, possible_moves: List[Tuple[int, int]], grid_info: Dict[str, Any]) -> Optional[Tuple[int, int]]:
 
@@ -21,15 +21,18 @@ class LLMAgent(SimpleAgent):
 
         prompt: str = self._create_prompt(grid_info, possible_moves)
 
+        # Add the current position to the path
+        self.path.append(grid_info["agent_position"])
+
         try:
             response: str = self._query_llm(prompt)
             print(response)
             best_move_index: int = self._parse_llm_response(response)
 
-            return possible_moves[best_move_index]
+            return possible_moves[best_move_index]  # Raises an error if the index is out of range
 
         except Exception as e:
-            print(f"❌ LLM Error: {e}")
+            print(f"Error: {e}")
             # Fallback to the simple strategy
             return super().decide_move(possible_moves, grid_info)
 
@@ -41,44 +44,49 @@ class LLMAgent(SimpleAgent):
         items_collected = grid_info["items_collected"]
         items_total = items_collected + len(items)
 
-        # Format possible moves as numbered list for LLM selection
+        # Format possible moves as a 1-index numbered list for LLM selection
         moves_str = ""
         for i, move in enumerate(possible_moves):
-            # 1-index the moves
             moves_str += f"{i + 1}. Move to {move}\n"
 
         prompt = f"""You are playing a grid game. Choose the best move.
 GOAL: Get the highest score by collecting items and reaching the goal efficiently.
+You are scored based on: Goal Reached Bonus + Items Collected percentage + Efficiency Bonus
 
 CURRENT STATE:
 - You are at: {agent_pos}
 - Goal is at: {goal_pos}
+- Items location: {items}
 - Items collected: {items_collected}/{items_total}
 - Obstacles to avoid: {obstacles}
+- Path taken so far: {self.path}
 
 YOUR OPTIONS:
 {moves_str}
 
 INSTRUCTIONS:
-1. Collect items when possible
-2. Move toward the goal
-3. Avoid obstacles
-4. Choose efficiently
-5. Be decisive
+1. Prioritize collecting items over reaching the goal
+2. Collect items when they are accessible with moderate effort
+3. Pursue items that require reasonable detours (not just direct path items)
+4. Avoid getting trapped in dead ends or making excessive backtracking
+5. Move toward the goal if remaining items are too costly to reach
+6. Give additional consideration for moves to locations that were already visited 
 
 Answer with: <move>NUMBER</move>"""
 
         return prompt
 
     def _query_llm(self, prompt: str) -> str:
-        """Query Ollama API exactly like the README example."""
+        """Query the LLM's API"""
+        try:
+            response = self.model.generate_content(prompt)
+            response_text: str = response.candidates[0].content.parts[0].text
+            return response_text
 
-        response = self.model.generate_content(prompt)
-        response_text = response.candidates[0].content.parts[0].text
+        except Exception as e:
+            raise RuntimeError(f"Error querying LLM: {e}")
 
-        return response_text
-
-    def _parse_llm_response(self, response_text) -> int:
+    def _parse_llm_response(self, response_text: str) -> int:
         """Extract move number from <move>NUMBER</move> tags."""
         # Look for <move>NUMBER</move> pattern
         move_match = re.search(r'<move>(\d+)</move>', response_text, re.IGNORECASE)

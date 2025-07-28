@@ -65,7 +65,7 @@ def select_difficulty() -> Optional[str]:
     
     while True:
         # choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
-        choice = 'e'
+        choice = 'm'
         if choice == 'q':
             return None
         elif choice == 'e':
@@ -112,7 +112,7 @@ def run_demo() -> None:
     # Run simulation
     result: Dict[str, Any] = simulator.run_simulation(
         agent=agent,
-        delay=1.0,  # Standard delay
+        delay=1.5,  # Standard delay
         clear_screen=True,
         verbose=True
     )
