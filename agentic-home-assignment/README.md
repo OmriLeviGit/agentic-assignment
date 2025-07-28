@@ -6,9 +6,10 @@ Submission for the agentic home assignment.
 1. [Getting Started](#getting-started)
    - [Prerequisites](#prerequisites)
    - [Installation](#installation)
+   - [Gemini API Key](#gemini-api-key)
    - [Running Local LLM with Ollama](#running-local-llm-with-ollama)
-   - [Test the API endpoint](#test-the-api-endpoint)
-   - [Running the Simple Agent (Baseline)](#running-the-simple-agent-baseline)
+   - [Test the llama API endpoint](#test-the-llama-api-endpoint)
+   - [Running the Agent](#running-the-agent)
 
 2. [Project Structure](#project-structure)
 
@@ -37,12 +38,12 @@ Submission for the agentic home assignment.
    - [Multiple LLM Agents with Separate Histories](#multiple-llm-agents-with-separate-histories)
    - [Dynamic Context Summarization](#dynamic-context-summarization)
 
-
 ## Getting Started
 
 ### Prerequisites
 - Python 3.8-3.11
 - Docker (for Ollama/TinyLlama)
+- Gemini API Key (optional, and highly recommended)
 - Required dependencies (install via requirements.txt)
 
 ### Installation
@@ -63,6 +64,18 @@ cd agentic-home-assignment
 pip install -r requirements.txt
 ```
 
+### Gemini API Key
+
+The LLM agent can optionally use Google's Gemini API for improved performance (and speed on some machines).
+
+To set up the Gemini API key:
+
+1. Copy the example environment file: rename `.env.example` to `.env`
+2. Replace `KEY` in the file with your actual Gemini API key
+3. The format should be: `GEMINI_API_KEY=your_actual_api_key_here`
+
+**Note**: The Gemini API key is recommended but optional. The agent will automatically fall back to the local TinyLlama model if no valid API key is found.
+
 ### Running Local LLM with Ollama
 
 **This assignment is designed and must work with Ollama and TinyLlama.** For development and testing, you'll run a lightweight LLM locally using Docker and Ollama:
@@ -75,7 +88,7 @@ docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 docker exec -it ollama ollama pull tinyllama
 ```
 
-### Test the API endpoint
+### Test the llama API endpoint
 
 **Linux/Mac:**
 ```bash
@@ -105,13 +118,10 @@ python main.py
 ```
 
 This will:
-1. Show you an **agent selection** and difficulty selection menus
+1. Show you agent selection and difficulty selection menus
 2. Let you choose between Easy, Medium, or Hard
 3. Run the Simple Rule-Based Agent (or your LLM agent)
 4. Display the results and scoring
-
-> By default, the LLM agent will attempt to run using Gemini (more on that in the approach section).
-As a fallback, it will use the llama model, so if it's necessary to run using the tiny llama one, just invalidate the API key.
 
 ## Project Structure
 
