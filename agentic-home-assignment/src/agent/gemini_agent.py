@@ -1,10 +1,10 @@
+import os
 import re
 from typing import Tuple, List, Optional, Dict, Any
 from .simple_agent import SimpleAgent
 import google.generativeai as genai
 
-# A free test key with very restricting rate limits, would NEVER be here under normal circumstances
-API_KEY = "AIzaSyBd5H8RN16q0_i9eOMMOzGgbZBbVAK1FtU"
+API_KEY = os.getenv('GOOGLE_API_KEY')
 genai.configure(api_key=API_KEY)
 
 class LLMAgent(SimpleAgent):
