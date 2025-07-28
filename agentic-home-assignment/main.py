@@ -65,7 +65,7 @@ def select_difficulty() -> Optional[str]:
     
     while True:
         # choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
-        choice = 'h'
+        choice = 'm'
         if choice == 'q':
             return None
         elif choice == 'e':

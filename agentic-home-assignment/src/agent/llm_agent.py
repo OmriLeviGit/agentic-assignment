@@ -3,6 +3,7 @@ from typing import Tuple, List, Optional, Dict, Any
 from .base_agent import BaseAgent
 from .simple_agent import SimpleAgent
 from ..llm.gemini_llm import GeminiLLM
+from ..llm.tiny_llama_llm import TinyLlamaLLM
 from ..llm.llm_interface import LLMInterface
 
 
@@ -11,12 +12,12 @@ class LLMAgent(BaseAgent):
 
     def __init__(self,
                  name: str = "LLMAgent",
-                 llm_provider: Optional[LLMInterface] = GeminiLLM(),
+                 llm_provider: Optional[LLMInterface] = None,
                  fallback_agent: Optional[BaseAgent] = None):
         super().__init__(name)
 
         # LLM provider
-        self.llm: LLMInterface = llm_provider or GeminiLLM()
+        self.llm: LLMInterface = self._setup_llm_with_fallback(llm_provider)
 
         # Fallback agent
         self.fallback_agent = fallback_agent or SimpleAgent()
@@ -25,9 +26,34 @@ class LLMAgent(BaseAgent):
         self.visit_count: Dict[Tuple[int, int], int] = {} # maps visited pos to the number of times visited
         self.context: List[Dict[str, Any]] = [] # summary of the previous llm responses
 
-    def decide_move(self,
-                    possible_moves: List[Tuple[int, int]],
-                    grid_info: Dict[str, Any],
+    def _setup_llm_with_fallback(self, llm_provider: Optional[LLMInterface]) -> LLMInterface:
+        """Setup LLM with fallback chain: Custom -> Gemini -> Ollama"""
+
+        # If a specific provider is given, try it first
+        if llm_provider is not None:
+            if llm_provider.is_available():
+                return llm_provider
+
+        # Try Gemini
+        try:
+            gemini = GeminiLLM()
+            if gemini.is_available():
+                print("Using Gemini LLM")
+                return gemini
+        except Exception as e:
+            print(f"Gemini not available: {e}")
+
+        # Fall back to tiny llama
+        try:
+            llama = TinyLlamaLLM()
+            print("Using TinyLlama")
+            return llama
+        except Exception as e:
+            print(f"Ollama setup failed: {e}")
+            raise RuntimeError("No LLM providers available!")
+
+
+    def decide_move(self, possible_moves: List[Tuple[int, int]], grid_info: Dict[str, Any],
                     verbose: bool = True) -> Optional[Tuple[int, int]]:
         """Make a move decision using LLM reasoning."""
 
@@ -55,14 +81,12 @@ class LLMAgent(BaseAgent):
             # Record decision
             chosen_move = possible_moves[move_index]
             self._record_decision(chosen_move, summary)
-            # move_analysis = self.get_move_analysis(possible_moves, obstacles, items, goal_pos)
+
 
             return chosen_move
 
         except Exception as e:
-            print("Error: ")
-            if verbose:
-                print(f"Error: {e}. Falling back to simple strategy.")
+            print(f"Error: {e}. Falling back to simple strategy.")
 
             # Fallback to simple agent
             fallback_move = self.fallback_agent.decide_move(possible_moves, grid_info)
@@ -80,8 +104,9 @@ class LLMAgent(BaseAgent):
         items_collected = grid_info["items_collected"]
         items_total = items_collected + len(items)
 
-        context_str = self._get_context_str()
-        possible_moves_str = self._get_possible_moves_str(possible_moves)
+        context_str = "PREVIOUSLY CHOSEN MOVES: " + self._get_context_str()
+        possible_moves_str = "YOUR OPTIONS: " + self._get_possible_moves_str(possible_moves)
+        move_analysis = "MOVE ANALYSIS: " + self._get_move_analysis(possible_moves, obstacles, items, goal_pos)
 
         prompt = f"""You are an intelligent agent that can navigate through a grid-based world.
 Your goal is to collect items, and reach a target goal efficiently. Positions are given in (x, y) coordinates.
@@ -95,9 +120,7 @@ CURRENT STATE:
 - Items collected: {items_collected}/{items_total}
 - Obstacles found at: {obstacles}
 
-PREVIOUS CHOSEN MOVES:
 {context_str}
-YOUR OPTIONS:
 {possible_moves_str}
 
 INSTRUCTIONS:
@@ -170,8 +193,7 @@ write the number of the final answer with: <move>NUMBER</move>"""
         }
         self.context.append(context_entry)
 
-
-    def get_move_analysis(self, possible_moves, obstacles, items, goal_pos):
+    def _get_move_analysis(self, possible_moves: List[Tuple[int, int]], obstacles, items, goal_pos):
         move_info = []
 
         for i, move in enumerate(possible_moves):
@@ -190,16 +212,16 @@ write the number of the final answer with: <move>NUMBER</move>"""
                     check_pos = (x + dx, y + dy)
 
                     if check_pos in obstacles:
-                        direction = self.get_direction_name(dx, dy)
+                        direction = self._get_direction_name(dx, dy)
                         nearby_obstacles.append(direction)
 
                     elif check_pos in items:
-                        direction = self.get_direction_name(dx, dy)
+                        direction = self._get_direction_name(dx, dy)
                         distance = abs(dx) + abs(dy)
                         nearby_items.append(f"{direction} ({distance} steps)")
 
                     elif check_pos == goal_pos:
-                        direction = self.get_direction_name(dx, dy)
+                        direction = self._get_direction_name(dx, dy)
                         distance = abs(dx) + abs(dy)
                         goal_info = f"{direction} ({distance} steps)"
 
@@ -221,7 +243,7 @@ write the number of the final answer with: <move>NUMBER</move>"""
 
         return "\n\n".join(move_info)
 
-    def get_direction_name(self, dx, dy):
+    def _get_direction_name(self, dx: int, dy: int):
         """Convert relative coordinates to direction names"""
         if dx == 0 and dy < 0:
             return "NORTH"
@@ -233,14 +255,15 @@ write the number of the final answer with: <move>NUMBER</move>"""
             return "EAST"
         elif dx < 0 and dy < 0:
             return "NORTHWEST"
-        elif dx > 0 and dy < 0:
+        elif dx > 0 > dy:
             return "NORTHEAST"
-        elif dx < 0 and dy > 0:
+        elif dx < 0 < dy:
             return "SOUTHWEST"
         elif dx > 0 and dy > 0:
             return "SOUTHEAST"
         else:
             return f"({dx},{dy})"
+
     def reset(self) -> None:
         """Reset agent state for a new episode."""
         super().reset()
