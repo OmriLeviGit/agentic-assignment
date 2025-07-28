@@ -1,84 +1,26 @@
-# Build Your Own Agent - Home Assignment
 
-## Overview
-
-Welcome to the Grid World Agent Challenge! This is a coding assignment where you'll build an intelligent agent that can navigate through a grid-based world, collect items, and reach a target goal efficiently.
-
-## The Challenge
-
-You are provided with a simulated grid environment containing:
-- 🚩 **Goal**: Target location the agent must reach
-- 💎 **Items**: Collectible objects that increase your score
-- 🚫 **Obstacles**: Barriers that block movement
-- 🤖 **Agent**: Your intelligent navigator (to be implemented)
-
-Your task is to implement an **LLM-based agent** that can intelligently navigate this world, make strategic decisions about item collection, and reach the goal efficiently.
-
-## Current Implementation
-
-We've provided a baseline **Simple Rule-Based Agent** that uses basic pathfinding algorithms. While functional, this agent has limitations:
-- Uses simple rule-based logic
-- Limited strategic planning
-- No advanced decision making
-- Basic item collection strategy
-
-## Your Mission
-
-**Implement an LLM-based agent** that outperforms the simple agent by:
-
-1. **Strategic Planning**: Use LLM reasoning to plan optimal paths
-2. **Dynamic Decision Making**: Adapt to changing situations in real-time
-3. **Item Collection Strategy**: Intelligently decide which items to collect based on proximity and value
-4. **Goal-Oriented Behavior**: Balance between item collection and goal achievement
-
-## Difficulty Levels
-
-The simulation offers three difficulty levels to test your agent:
-
-### 🟢 Easy - Learning Mode
-- **Grid Size**: 5x5
-- **Obstacles**: 3
-- **Items**: 3
-- **Max Steps**: 25
-- **Challenge**: Perfect for beginners to learn navigation basics
-
-### 🟡 Medium - Tactical Challenge
-- **Grid Size**: 8x8
-- **Obstacles**: 13
-- **Items**: 7
-- **Max Steps**: 60
-- **Challenge**: Requires planning and strategic thinking
-
-### 🔴 Hard - Master Level
-- **Grid Size**: 10x10
-- **Obstacles**: 25
-- **Items**: 12
-- **Max Steps**: 100
-- **Challenge**: Ultimate test of intelligence and efficiency
-
-## Scoring Mechanism
-
-Your agent will be evaluated based on:
-- **Goal Achievement**: Did the agent reach the target? (Pass/Fail)
-- **Item Collection**: Number of items collected vs. available
-- **Efficiency**: Steps taken vs. maximum allowed steps
-- **Overall Score**: Composite score out of 100 points
-
-The scoring algorithm considers:
-```
-Score = (Goal Reached Bonus) + (Items Collected %) + (Efficiency Bonus)
-```
-
+Submission for the agentic home assignment.
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.8-3.11
+- Docker (for Ollama/TinyLlama)
 - Required dependencies (install via requirements.txt)
 
 ### Installation
+
+#### Linux/Mac:
 ```bash
 python -m venv .venv
 source .venv/bin/activate       
+cd agentic-home-assignment
+pip install -r requirements.txt
+```
+
+#### Windows:
+```cmd
+python -m venv .venv
+.venv\Scripts\activate
 cd agentic-home-assignment
 pip install -r requirements.txt
 ```
@@ -93,13 +35,27 @@ docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 
 # Pull the TinyLlama model (lightweight, good for testing)
 docker exec -it ollama ollama pull tinyllama
+```
 
-# Test the API endpoint
+### Test the API endpoint
+
+**Linux/Mac:**
+```bash
 curl http://localhost:11434/api/generate -d '{
   "model": "tinyllama",
   "prompt": "Hello, world!",
   "stream": false
 }'
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-RestMethod -Uri "http://localhost:11434/api/generate" -Method Post -ContentType "application/json" -Body '{"model": "tinyllama", "prompt": "Hello, world!", "stream": false}'
+```
+
+**Windows (CMD with curl):**
+```cmd
+curl http://localhost:11434/api/generate -d "{\"model\": \"tinyllama\", \"prompt\": \"Hello, world!\", \"stream\": false}" -H "Content-Type: application/json"
 ```
 
 ### Running the Simple Agent (Baseline)
@@ -111,105 +67,190 @@ python main.py
 ```
 
 This will:
-1. Show you the difficulty selection menu
+1. Show you an agent selection and difficulty selection menus
 2. Let you choose between Easy, Medium, or Hard
-3. Run the Simple Rule-Based Agent
+3. Run the Simple Rule-Based Agent (or your LLM agent)
 4. Display the results and scoring
 
-#### Example Run:
-```
-🎮 Build Your Own Agent - Home Assignment
-============================================================
-Welcome to the Grid World Agent Challenge!
-Navigate to the target location efficiently while gathering items along the way!
-
-🎯 Difficulty Selection:
-============================================================
-🟢 Easy - Learning Mode
-   Small 5x5 grid with minimal obstacles and clear paths
-   Grid: 5x5, Obstacles: 3, Items: 3
-   Max Steps: 25
-   🎲 Perfect for beginners to learn navigation basics
-
-🟡 Medium - Tactical Challenge
-   Moderate 8x8 grid with strategic obstacle placement
-   Grid: 8x8, Obstacles: 13, Items: 7
-   Max Steps: 60
-   🎲 Requires planning and strategic thinking
-
-🔴 Hard - Master Level
-   Complex 10x10 maze with challenging pathfinding
-   Grid: 10x10, Obstacles: 25, Items: 12
-   Max Steps: 100
-   🎲 Ultimate test of intelligence and efficiency
-
-Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: e
-
-🤖 Using Simple Rule-Based Agent
-
-🚀 Starting: 🟢 Easy - Learning Mode
-============================================================
-
-🤖 Running with: Simple Rule-Based Agent
-🎯 Difficulty: 🟢 Easy - Learning Mode
-📊 Challenge: Perfect for beginners to learn navigation basics
-
-Press Enter to start the simulation...
-```
 
 ## Project Structure
 
 ```
 agentic-home-assignment/
-├── main.py                 # Main entry point
+├── assets/                         # Asset files (images, configs, etc.)
 ├── src/
 │   ├── agent/
-│   │   ├── simple_agent.py # Baseline rule-based agent
-│   │   └── llm_agent.py    # Your LLM agent (to implement)
-│   ├── simulation/
-│   │   ├── simulator.py    # Grid world simulator
-│   │   ├── world.py        # World state management
-│   │   └── entities.py     # Game entities (agent, items, obstacles)
-├── requirements.txt        # Dependencies
-└── README.md              # This file
+│   │   ├── base_agent.py          # Abstract base class for all agents
+│   │   ├── llm_agent.py           # LLM-powered agent with fallback logic
+│   │   └── simple_agent.py        # Simple rule-based baseline agent
+│   ├── environment/
+│   │   └── [environment files]    # Grid world, entities, game logic
+│   ├── llm/
+│   │   ├── gemini_llm.py          # Google Gemini API implementation
+│   │   ├── llm_interface.py       # Abstract class for LLM providers
+│   │   └── tiny_llama_llm.py      # Ollama TinyLlama local implementation
+│   └── simulation/
+│       └── [simulation files]     # Simulators, scoring, game loop
+├── .env                           # Environment variables (API keys)
+├── main.py                        # Main entry point and CLI interface
+├── README.md                      # Original assignment instructions
+├── README2.md                     # Additional documentation/notes
+└── requirements.txt               # Python dependencies
 ```
 
-## Evaluation Criteria
+## Approach
+After reading through the README and running the demo, I identified three distinct strategies:
+### Simplest approach
+Instruct the LLM to aim to collect items and reach the goal efficiently in a generic way, while warning him from common pitfalls and trying to balance its risk tolerance.
+This is the naïve and simplest approach, all it required is a good prompt.
+### Pre-compute and have the LLM use addition information
+Offload most of the calculation to standard algorithms and have the LLM take the calculation result and use it for decision making.
+One of possibility was to use multi-source BFS, which would allow to calculate the shortest distance between each two items, and then let the LLM determine the order of items needed to be collected while prioritizing clusters and avoiding long corridors for minimal reward if it comes at the cost of efficiency.
+Another direction would be to use an algorithm to find clusters, and perform a similar operation, but this one is vulnerable to adversarial cases were the placement of two items is close to each other, but the actual distance is much larger due to blockades.
+I determined that this is more on the algorithmic side and was not the goal of the assignment.
+### A proper agent
+Build A more “sophisticated” agent, where the LLM takes high level strategy decision, stores them “in memory” (a list containing previous knowledge and decisions gathered in previous steps, allowing the LLM to , and in each step the LLM would evaluate the strategy and update the memory accordingly. In addition, functions like “think”,  “observe”, etc., can be used, and implemented using libraries to invoke function calls directly from the LLM's instructions, but since I have yet to had a chance to try these, I won't be using them :)
+### Clarifying questions
+Considering the 3 options, I was under the impression that simplest solution may be *too* simple for the assignment, pre-computing requires the information that the agent did not have access to, and the third option had low chance of working well when using a smaller model, as they tend to hallucinate and their mistakes propagate and corrupt the memory.
 
-Your implementation will be evaluated on:
+As all 3 options are vastly different from each other, I left like I had to ask some clarifying questions, to determine what direction would be more in-line with the expectations. Since I already had a general idea of how to execute each of the options, all I needed was to determine which ones to eliminate, which is why I decided to keep my questions on the technical side.
 
-1. **Functionality** (30%): Does the agent work correctly?
-2. **Performance** (25%): How well does it score compared to baseline?
-3. **Code Quality** (20%): Clean, readable, well-documented code
-4. **Innovation** (15%): Creative use of LLM capabilities
-5. **Robustness** (10%): Error handling and edge case management
+Some of the questions I asked were:
+1. Can the information the agent has access to be modified? (e.g., accessing the max step, having access to the dimensions of the grid)
+2. Do all decisions need to be made by the LLMs? Can there still be “rule-based decisions” (i.e., if an attempt to reach an item would lead in not reaching the goal in the required step, go straight to the goal)?
+3. Does the balance between the “greediness” of the decisions need to be numerically calculated or should the LLM reach decisions by itself?
 
-### Testing Environment
+After speaking with Oded, it seemed that I could cross out the algorithmic approach as I thought. Additionally, from the conversion I was under the impression that the got satisfactory results with relatively simple approach, short prompt, etc., so I decided to start working towards the simplest approach, and if the model could handle it, I would add a memory function and maybe some functions to access and edit memory.
 
-**Important**: Your solution will be tested on a much larger set of grids with varying difficulties beyond the three provided difficulty levels. The evaluation will include:
+In this case, since all decisions are made by the LLM and the scoring method is not known (the function is, but the weights are not), the LLM would have a general idea of how its scored but without giving it actual numeric values.
+### Starting out
+The idea is as follows:
+- Extract the information from `gird_info`
+- Build a prompt out of the information and the possible moves, with generic instruction that explains the task at hand, gives the current state, and warns it from common pitfalls.
+- Extract the result from the response.
 
-- **Extended Grid Sizes**: Grids ranging from 5x5 up to 15x15 or larger
-- **Variable Obstacle Densities**: From sparse (10% coverage) to dense (40% coverage) obstacle layouts
-- **Dynamic Item Distributions**: Different numbers and placement patterns of collectible items
-- **Diverse Maze Configurations**: Including corridors, rooms, dead-ends, and complex pathfinding scenarios
-- **Randomized Layouts**: Procedurally generated grids to test adaptability
-- **Edge Cases**: Corner positions, blocked paths, unreachable goals, and other challenging scenarios
+My mistake was to start with a relatively large prompt and work my way down. Even the tiny model was not very fast on my machine, and trial and error with the prompt took more time than it should have.
+This was a problem, because it seemed that the small model could not handle any prompt well, not even the simple ones.
+### Prompt examples
+#### A more specific prompt that would probably work with a larger model
+```
+<instructions>
+You are an intelligent agent that can navigate through a grid-based world. Your goal is to collect items, and reach a target goal efficiently.
+</instructions>
 
-Your agent should be robust enough to handle these varied conditions and demonstrate consistent performance across different grid configurations. The ability to generalize beyond the training scenarios is a key evaluation criterion.
+<priorities>
+1. Balance item collection vs goal completion based on progress
+2. Prioritize HIGH CONCENTRATION item areas
+3. Avoid deadends or obstacles that make items appear close but actually require long detours
+</priorities>
 
-## Submission
+<state>
+Agent: {agent_pos} | Goal: {goal_pos} | Distance to goal: {goal_distance}
+Items available: {items}
+Items collected: {items_collected}
+Steps taken so far: {steps_taken}
+Possible moves: {possible_moves}
+Obstacles: {obstacles}
+</state>
 
-Include in your submission:
-1. Your LLM agent implementation
-2. Documentation of your approach and design decisions
-3. Performance comparison with baseline agent
-4. Instructions for running your agent
-5. Any additional features or improvements
+In your reply, explain your reasoning and your strategy.
+the best move should be wrapped in the tags <response>MOVE</response>
 
-## Questions?
+Example:
+	My reasoning:
+	
+	My strategy:
+	
+	<response>
+	(x,y)
+	</response>
+```
+As mentioned, this prompt was way too complicated for the smaller model.
+#### Relatively simple
+```
+You are playing a grid game. Choose the best move.
+GOAL: Get the highest score by collecting items and reaching the goal efficiently.
 
-If you have any questions about the assignment, feel free to reach out. Good luck building your intelligent agent!
+CURRENT STATE:
+- You are at: {agent_pos}
+- Goal is at: {goal_pos}
+- Items location: {items}
+- Items collected: {items_collected}/{items_total}
+- Obstacles to avoid: {obstacles}
+
+YOUR OPTIONS:
+{moves_str}
+
+INSTRUCTIONS:
+1. Collect items when possible
+2. Move toward the goal
+3. Avoid obstacles
+4. Choose efficiently
+
+Answer with: <move>NUMBER</move>"""
+```
+The LLM was very indecisive, was either stuck in a loop between going back and forth, or essentially making random moves. 
+#### Very simple
+```
+Your task is to reach the goal.
+Current location: {agent_pos}
+Goal location: {goal_pos}
+Possible moves: {moves_str}
+
+respond only with the best move, without any additional information
+```
+I attempted to use several prompts like these, the agent managed to reach the goal, but often disregarded items completely (understandably).
+
+Some of the things I have attempted:
+- Giving limited access to the obstacles or items (only ones that are close enough to the agent)
+- Giving instructions wrapped in XML tags
+- Asking the LLM to respond in tags
+- Asking the LLM to explain his reasoning before returning the result
+- Asking it to return the result without any explanation
+- Changing the options in the query itself (temperature, top_p, top_k, number of tokens)
+- Numbering the possible moves and asking for the index\move number instead of the move itself
+- Instructing as a system prompt
+
+The issues I have encountered were that unless the prompt was very simple, the LLM would "mirror" the prompt back to me, making accessing the actual response very hard to access (as it completely disregarded replying tags). Additionally, when explaining what it knows (which it did even if instructed to avoid explaining), it kept confusing what it knows - it often assumed its origin is the goal state, or completely ignored the possible moves and attempted to jump around by more than a single step.
+### Gemini
+At a certain point I felt that this is not a good use of the time I had left, and that I need to move on, as every query took 10-20 seconds to work and the results were not satisfactory regardless of what i did.
+Oded mentioned he was able to get good results with the TinyLlama model, and I'm extremely curious to see what I could have done differently :)
+
+I knew that Gemini had some limited free API keys for a rate limited model, so i moved on to use Gemini over the llama one. This is not a one-to-one comparison, as the model is better than TinyLlama, but it still one of the quick, cheaper ones.
+
+Its worth saying that the API key is easily generated, free and limited, and easily disabled, which is why i felt comfortable inserting it to the code and I will delete it once the assignment ends.
+
+> Later on I found out that the rate limits were too restricting, so I changed the key and added it to an .env file that I will send separately.
+
+```
+Due to time constraints, my goal now was to "finish the assignment" with the naive approach, and if i have time i may go back and attempt to add the more advanced memory system.
+```
+...is what i thought, but I ended up needing to implement some of these features regardless to improve results.
 
 ---
 
-*Happy coding! 🚀*
+With the Gemini model working better (though not always correct),  I let him explain his reasoning, which allowed for much better debugging of the prompt.
+
+More specific prompting considerations:
+- It was clear he is very risk-averse, and since Oded mentioned the step limit was more as a fail-safe for the simulator (though I'm sure it will mazes where items should be ignored will be tested), i asked him the model to be relatively greedy.
+- As explained before, since we cannot know the exact weighting of the rewards, I did let him know how he is evaluated, but without giving it the actual numeric values.
+- In the end, I did decide to keep track of the previous steps in attempt to avoid the unnecessary backtracking
+
+I quickly got good results for the easy maze, and moved on to the medium, where it has problems with the corner in the center, due to the LLM changing his mind every few steps, which leads to back-tracking indefinitely.
+
+If i had more time, i would have added a detection method for when the model is stuck.
+I think I could implement it relatively well by simply keeping track of all unvisited neighbors (possible moves that were not taken), and have the model return a flag, which would change the prompt until reaching cells that weren't searched.
+I could also have the LLM output a conclusion for each cell, and use it to make decisions, and this way "close off" dead ends.
+We could also obviously detect repetitions in code, but this takes some of the agency from the LLM.
+
+Implementing these things does not take that much time (a few minutes at most probably), but making sure that the changes actually lead to improvement does, especially when the LLM is not local.
+## Design decisions
+
+### Fallback agent
+Initially, I used inheritance to leverage the SimpleAgent's `decide_move()` method as a fallback, despite inheritance not always being the most developer-friendly approach. Given the small scope of this assignment, this seemed acceptable. Later, I refactored to pass the fallback agent as an optional parameter with SimpleAgent as the default, which provides more flexibility for using different fallback strategies.
+### LLMs
+Once the logic grew a bit, I decided to refactor out the LLM provider, as it is different from the actual "business logic", which is especially useful under the circumstances where i used a different model than the tiny llama one.
+This makes it easy to swap out the LLM "engine", while keeping the functionality of the agent the same.
+And I tied it up with an abstract class (I called it an interface as it has no functionality of its own)
+
+The LLM agent attempts to use a provider received as a parameter, if none were found then it will attempt to use the Gemini one, and if it fails, it will attempt to use the tiny llama one.

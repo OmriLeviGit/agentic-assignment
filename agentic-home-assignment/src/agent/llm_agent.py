@@ -54,7 +54,7 @@ class LLMAgent(BaseAgent):
 
 
     def decide_move(self, possible_moves: List[Tuple[int, int]], grid_info: Dict[str, Any],
-                    verbose: bool = True) -> Optional[Tuple[int, int]]:
+                    verbose: bool = False) -> Optional[Tuple[int, int]]:
         """Make a move decision using LLM reasoning."""
 
         if not possible_moves:

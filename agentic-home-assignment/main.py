@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, Union
 from src.simulation.simulator import get_simulator_by_difficulty, Simulator
 from src.agent.simple_agent import SimpleAgent
 from src.agent.llm_agent import LLMAgent
+from src.agent.base_agent import BaseAgent
 
 
 def get_difficulty_info() -> Dict[str, Dict[str, Union[str, int]]]:
@@ -30,7 +31,7 @@ def get_difficulty_info() -> Dict[str, Dict[str, Union[str, int]]]:
         "medium": {
             "name": "🟡 Medium - Tactical Challenge",
             "description": "Moderate 8x8 grid with strategic obstacle placement",
-            "grid_size": "8x8", 
+            "grid_size": "8x8",
             "obstacles": 13,
             "items": 7,
             "max_steps": 60,
@@ -48,13 +49,32 @@ def get_difficulty_info() -> Dict[str, Dict[str, Union[str, int]]]:
     }
 
 
+def select_agent() -> Optional[BaseAgent]:
+    """Let user select agent type."""
+    print("🤖 Agent Selection:")
+    print("=" * 60)
+
+    print("1️⃣  Simple Rule-Based Agent")
+    print("2️⃣  LLM-Based Agent")
+
+    while True:
+        choice: str = input("Select agent (1 -> simple/ 2 -> llm) or 'q' to quit: ").strip().lower()
+        if choice == 'q':
+            return None
+        elif choice == '1':
+            return SimpleAgent("Simple Rule-Based Agent")
+        elif choice == '2':
+            return LLMAgent("LLM-Based Agent")
+        else:
+            print("❌ Invalid choice. Please enter '1' for simple agent, '2' for LLM agent, or 'q' to quit.")
+
 def select_difficulty() -> Optional[str]:
     """Let user select difficulty level."""
     difficulty_info: Dict[str, Dict[str, Union[str, int]]] = get_difficulty_info()
-    
+
     print("🎯 Difficulty Selection:")
     print("=" * 60)
-    
+
     for difficulty, info in difficulty_info.items():
         print(f"{info['name']}")
         print(f"   {info['description']}")
@@ -62,10 +82,9 @@ def select_difficulty() -> Optional[str]:
         print(f"   Max Steps: {info['max_steps']}")
         print(f"   🎲 {info['challenge']}")
         print()
-    
+
     while True:
-        # choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
-        choice = 'm'
+        choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
         if choice == 'q':
             return None
         elif choice == 'e':
@@ -85,55 +104,55 @@ def run_demo() -> None:
     if not selected_difficulty:
         print("👋 Goodbye!")
         return
-    
+
     # Use simple agent only for baseline
     print("\n🤖 Using Simple Rule-Based Agent")
-    
+
     difficulty_info: Dict[str, Union[str, int]] = get_difficulty_info()[selected_difficulty]
     print(f"\n🚀 Starting: {difficulty_info['name']}")
     print("=" * 60)
-    
+
     # Create difficulty-specific simulator
     simulator: Simulator = get_simulator_by_difficulty(selected_difficulty)
-    
+
+    # Select agent
+    agent: BaseAgent = select_agent()
+
     # Set up world (uses predefined layouts for each difficulty)
     simulator.setup_world()
-    
-    # Create simple agent
-    agent: SimpleAgent = SimpleAgent("Simple Rule-Based Agent")
-    # agent: LLMAgent = LLMAgent("Simple Rule-Based Agent")
+
 
     print(f"\n🤖 Running with: {agent.name}")
     print(f"🎯 Difficulty: {difficulty_info['name']}")
     print(f"📊 Challenge: {difficulty_info['challenge']}")
     print("\nPress Enter to start the simulation...")
-    # input()
-    
+    input()
+
     # Run simulation
     result: Dict[str, Any] = simulator.run_simulation(
         agent=agent,
-        # delay=0.5,  # Standard delay
+        delay=1.0,  # Standard delay
         clear_screen=True,
         verbose=True
     )
-    
+
     # Display results summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     status = "✅ SUCCESS" if result["success"] else "❌ FAILED"
-    
+
     summary = f"""🏆 FINAL RESULTS
-    {"="*60}
+    {"=" * 60}
     Difficulty: {difficulty_info['name']}
     Agent: {agent.name}
     Status: {status}
     Steps: {result['steps_taken']}/{simulator.max_steps}
     Items: {result['items_collected']}/{result['total_items_available']}
     Score: {result['score']:.1f}/100.0"""
-    
+
     print(summary)
-    
+
     # Ask if user wants to run another simulation
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     while True:
         again: str = input("Run another simulation? (y/n): ").strip().lower()
         if again == 'y':
@@ -155,7 +174,6 @@ Welcome to the Grid World Agent Challenge!
 Navigate to the target location efficiently while gathering items along the way!
 """
     print(welcome_message)
-
 
     try:
         run_demo()
