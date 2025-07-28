@@ -1,5 +1,43 @@
 
 Submission for the agentic home assignment.
+
+# Table of Contents
+
+1. [Getting Started](#getting-started)
+   - [Prerequisites](#prerequisites)
+   - [Installation](#installation)
+   - [Running Local LLM with Ollama](#running-local-llm-with-ollama)
+   - [Test the API endpoint](#test-the-api-endpoint)
+   - [Running the Simple Agent (Baseline)](#running-the-simple-agent-baseline)
+
+2. [Project Structure](#project-structure)
+
+3. [Approach](#approach)
+   - [Simplest approach](#simplest-approach)
+   - [Pre-compute and have the LLM use addition information](#pre-compute-and-have-the-llm-use-addition-information)
+   - [A proper agent](#a-proper-agent)
+   - [Clarifying questions](#clarifying-questions)
+   - [Starting out](#starting-out)
+   - [Prompt examples](#prompt-examples)
+   - [Gemini](#gemini)
+
+4. [Design decisions](#design-decisions)
+   - [Fallback agent](#fallback-agent)
+   - [LLMs](#llms)
+
+5. [Performance comparison](#performance-comparison)
+   - [Easy Difficulty](#easy-difficulty)
+   - [Medium Difficulty](#medium-difficulty)
+   - [Hard Difficulty](#hard-difficulty)
+
+6. [Further Features or Improvements](#further-features-or-improvements)
+   - [Getting Stuck Detection](#getting-stuck-detection)
+   - [Function Calling Integration](#function-calling-integration)
+   - [Memory Systems](#memory-systems)
+   - [Multiple LLM Agents with Separate Histories](#multiple-llm-agents-with-separate-histories)
+   - [Dynamic Context Summarization](#dynamic-context-summarization)
+
+
 ## Getting Started
 
 ### Prerequisites
@@ -58,7 +96,7 @@ Invoke-RestMethod -Uri "http://localhost:11434/api/generate" -Method Post -Conte
 curl http://localhost:11434/api/generate -d "{\"model\": \"tinyllama\", \"prompt\": \"Hello, world!\", \"stream\": false}" -H "Content-Type: application/json"
 ```
 
-### Running the Simple Agent (Baseline)
+### Running the Agent
 
 To see the baseline implementation in action:
 
@@ -67,11 +105,13 @@ python main.py
 ```
 
 This will:
-1. Show you an agent selection and difficulty selection menus
+1. Show you an **agent selection** and difficulty selection menus
 2. Let you choose between Easy, Medium, or Hard
 3. Run the Simple Rule-Based Agent (or your LLM agent)
 4. Display the results and scoring
 
+> By default, the LLM agent will attempt to run using Gemini (more on that in the approach section).
+As a fallback, it will use the llama model, so if it's necessary to run using the tiny llama one, just invalidate the API key.
 
 ## Project Structure
 
@@ -99,6 +139,11 @@ agentic-home-assignment/
 ```
 
 ## Approach
+
+The approach section is written in an exploratory style
+
+---
+
 After reading through the README and running the demo, I identified three distinct strategies:
 ### Simplest approach
 Instruct the LLM to aim to collect items and reach the goal efficiently in a generic way, while warning him from common pitfalls and trying to balance its risk tolerance.
@@ -157,13 +202,13 @@ In your reply, explain your reasoning and your strategy.
 the best move should be wrapped in the tags <response>MOVE</response>
 
 Example:
-	My reasoning:
-	
-	My strategy:
-	
-	<response>
-	(x,y)
-	</response>
+My reasoning:
+
+My strategy:
+
+<response>
+(x,y)
+</response>
 ```
 As mentioned, this prompt was way too complicated for the smaller model.
 #### Relatively simple
@@ -220,30 +265,34 @@ I knew that Gemini had some limited free API keys for a rate limited model, so i
 
 Its worth saying that the API key is easily generated, free and limited, and easily disabled, which is why i felt comfortable inserting it to the code and I will delete it once the assignment ends.
 
-> Later on I found out that the rate limits were too restricting, so I changed the key and added it to an .env file that I will send separately.
+> I later find the rate limits too restricting, so I changed the key and added it to an .env file that I will send separately. The model is **worse** than the one on the free trial, but faster.  
 
 ```
 Due to time constraints, my goal now was to "finish the assignment" with the naive approach, and if i have time i may go back and attempt to add the more advanced memory system.
 ```
-...is what i thought, but I ended up needing to implement some of these features regardless to improve results.
+...is what I thought, but I ended up needing to implement some of these features regardless to improve results.
 
 ---
 
-With the Gemini model working better (though not always correct),  I let him explain his reasoning, which allowed for much better debugging of the prompt.
+With the Gemini model working better (though not always correct), I let him explain his reasoning, which allowed for much better debugging of the prompt.
 
 More specific prompting considerations:
 - It was clear he is very risk-averse, and since Oded mentioned the step limit was more as a fail-safe for the simulator (though I'm sure it will mazes where items should be ignored will be tested), i asked him the model to be relatively greedy.
-- As explained before, since we cannot know the exact weighting of the rewards, I did let him know how he is evaluated, but without giving it the actual numeric values.
+- As explained before, since we cannot know the exact weighting of the rewards, I did let him know how he was evaluated, but without giving it the actual numeric values.
 - In the end, I did decide to keep track of the previous steps in attempt to avoid the unnecessary backtracking
 
-I quickly got good results for the easy maze, and moved on to the medium, where it has problems with the corner in the center, due to the LLM changing his mind every few steps, which leads to back-tracking indefinitely.
+After that, I quickly got good results for the easy maze, and moved on to the medium and the hard mazes.
+The agent had a problem dead ends or corners due to changing its mind few steps, which leads to back-tracking indefinitely.
+After further adjustments, the agent is able to release itself from most of these and advance to different parts of the mazes relatively quickly.
 
-If i had more time, i would have added a detection method for when the model is stuck.
-I think I could implement it relatively well by simply keeping track of all unvisited neighbors (possible moves that were not taken), and have the model return a flag, which would change the prompt until reaching cells that weren't searched.
-I could also have the LLM output a conclusion for each cell, and use it to make decisions, and this way "close off" dead ends.
-We could also obviously detect repetitions in code, but this takes some of the agency from the LLM.
+I attempted to add several mechanisms, some of which worked better or more consistently than others.
+For the sake of brevity, I'll quickly mention some of the methods that worked better:
 
-Implementing these things does not take that much time (a few minutes at most probably), but making sure that the changes actually lead to improvement does, especially when the LLM is not local.
+- Adding context that contains the 5 previous moves helped the agent release itself from back tracks, and stay on 
+previously selected target.
+- On weaker models, changing how the possible moves are written improved predictability and reproducibility of responses.
+- Analyzing cells around the potential moves sometimes helped with avoiding obstacles sometimes. I ended up commenting it one, but it has potential to be tuned.
+
 ## Design decisions
 
 ### Fallback agent
@@ -254,3 +303,153 @@ This makes it easy to swap out the LLM "engine", while keeping the functionality
 And I tied it up with an abstract class (I called it an interface as it has no functionality of its own)
 
 The LLM agent attempts to use a provider received as a parameter, if none were found then it will attempt to use the Gemini one, and if it fails, it will attempt to use the tiny llama one.
+
+
+## Performance comparison
+
+### Easy Difficulty
+<table>
+<tr>
+<td>
+
+**Simple Agent:**
+![default_easy.png](assets/default_easy.png)
+
+</td>
+<td>
+
+**LLM Agent:**
+![best_easy.png](assets/best_easy.png)
+
+</td>
+</tr>
+</table>
+As we can see, the simple missed an item, while the LLM one was relatively efficient, as the maze was simple and without any pitfalls.
+
+### Medium Difficulty
+<table>
+<tr>
+<td>
+
+**Simple Agent:**
+![default_medium.png](assets/default_medium.png)
+
+</td>
+<td>
+
+**LLM Agent:**
+![best_medium.png](assets/best_medium.png)
+
+</td>
+</tr>
+</table>
+
+In the medium difficulty, we can see that the simple agent had missed a lot of items, but was relatively quick. On the other hand, and while the LLM agent collected more items, it took more steps.
+This is both due to item prioritization, but also due to it making unnecessary\repeating moves. 
+
+### Hard Difficulty
+<table>
+<tr>
+<td>
+
+**Simple Agent:**
+![default_hard.png](assets/default_hard.png)
+
+</td>
+<td>
+
+**LLM Agent:**
+![best_hard.png](assets/best_hard.png)
+
+</td>
+</tr>
+</table>
+
+Here we can see a large difference between the two. The LLM agent could not beat the simple one, due to over prioritizing the cluster at the top.
+while it did collect more items, it took many more steps, which negated the benefit.
+
+## Further features or improvements
+
+Overall, the results of the LLM agent can certainly be improved.
+
+getting stuck
+activating with function
+adding memory 
+adding different prompting
+adding additional llm calls with separate history
+summarizing the last 5 
+
+A mechanism to get out of dead ends. This can be done using a 
+Improvements:
+- If I had more time (even though I had an extension, a lot of it was used on accessory stuff such as setting up the API key and Google Cloud account, or just flat out waiting for slow iterations), I would have added a detection method for when the model is stuck.
+Implementing these mechanisms does not take that much time (a few minutes at most probably), but making sure that the changes actually lead to improvement does, especially when the LLM is not local.
+
+## Further Features or Improvements
+
+Overall, the results of the LLM agent can certainly be improved.
+scoring
+### Getting Stuck Detection
+This is still a major issue. This can be addressed by implementing escape strategies when loops are detected, such as exploring unexplored directions or taking random moves to break the cycle,
+but in the allocated time I could ei
+- Adding penalties for revisiting recently visited positions in the decision-making process
+
+### Function Calling Integration
+Instead of relying purely on text-based responses, the agent can use LLM function calling capabilities:
+- Define specific functions for movement decisions (`move_north()`, `move_south()`, etc.)
+- Create planning functions (`analyze_grid()`, `find_optimal_path()`, `prioritize_items()`)
+- Enable the LLM to call these functions directly rather than parsing text responses
+- This provides more structured and reliable interaction with the environment
+
+### Memory Systems
+Implementing persistent memory to improve decision-making across episodes:
+- **Working Memory**: Store visited positions, failed attempts, and successful strategies within a single episode
+- **Long-term Memory**: Maintain performance data across episodes to learn from experiences
+- **Implementation approach**: Use a simple dictionary or database to store key-value pairs like `{"grid_pattern": "maze", "successful_strategy": "prioritize_items_near_goal"}`
+- Memory can inform future decisions and help avoid repeating ineffective strategies
+
+### Multiple LLM Agents with Separate Histories
+Use specialized LLM instances for different aspects of the problem:
+- **Planner Agent**: Maintains high-level strategy, analyzes the full grid, sets objectives and priorities
+- **Executor Agent**: Handles immediate move decisions based on current local situation
+- Each agent maintains its own conversation history tailored to its role
+- The planner provides strategic guidance to the executor, while the executor reports progress back to the planner
+- This separation allows for better focus and specialized reasoning for each task
+
+### Dynamic Context Summarization
+Instead of maintaining the last 5 raw messages, create a coherent, continuously updated summary:
+- Maintain a running paragraph that summarizes the agent's current understanding and strategy
+- Update this summary each step with new information (items collected, obstacles discovered, progress toward goal)
+- Replace outdated information while preserving relevant insights
+- Example: "Currently at (3,4), collected 2/5 items. Goal at (8,8). Identified blocked path through center due to obstacle wall. Strategy: collect remaining items in northeast quadrant before proceeding to goal via southern route."
+
+## Further Features or Improvements
+
+Overall, the results of the LLM agent can certainly be improved.
+These are the techniques or methods I thought of that can be used to further extend or improve the capabilities of the agent:
+
+### Getting Stuck Detection
+As mentioned, the agent can get stuck going back and forth between the same positions, creating inefficient oscillating patterns.
+When such patterns are identified, the agent can implement escape strategies such as exploring previously unexplored directions or taking deliberate random moves to break free from the loop.
+Additionally, the decision-making process can incorporate penalties for revisiting recently visited positions, naturally encouraging exploration of new areas.
+Knowing how the system is scored can help us adjust the system much better (again, it's in the code but then the code would not be 'generic' as requested).
+
+### Function Calling Integration
+The agent can use LLM function calling capabilities for more structured interactions.
+This involves defining specific functions for movement decisions and planning operations, allowing the LLM to call these directly for more reliable and precise control over the agent's behavior.
+
+### Memory Systems
+Implementing persistent memory can significantly improve decision-making both within episodes and across multiple runs. Working memory would store visited positions, failed attempts, and successful strategies during a single episode, while long-term memory could maintain performance data across episodes to learn from experience.
+
+### Multiple LLM Agents with Separate Histories
+Using specialized LLM instances for different aspects of the problem can improve overall performance through division of cognitive labor.
+A planner agent would maintain high-level strategy by analyzing the full grid and setting objectives, while an executor agent would handle immediate move decisions based on the current local situation.
+Each agent maintains its own conversation history tailored to its specific role, with the planner providing strategic guidance and the executor reporting progress back.
+
+### Dynamic Context Summarization
+Instead of presenting the 5 last messages, the agent can create and continuously update a coherent summary of its current understanding and strategy.
+This living document would be refreshed each step with new information such as items collected, obstacles discovered, and progress toward the goal, while replacing outdated details with current insights.
+
+---
+
+Implementing should not take that much time, and at the beginning I actually wanted to attempt to use some of these, 
+but due to the model choice, implementing each one would require extensive and separate testing and tuning of each one, just to know what the model can handle. 

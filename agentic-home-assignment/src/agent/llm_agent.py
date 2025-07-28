@@ -106,7 +106,7 @@ class LLMAgent(BaseAgent):
 
         context_str = "PREVIOUSLY CHOSEN MOVES: " + self._get_context_str()
         possible_moves_str = "YOUR OPTIONS: " + self._get_possible_moves_str(possible_moves)
-        move_analysis = "MOVE ANALYSIS: " + self._get_move_analysis(possible_moves, obstacles, items, goal_pos)
+        # move_analysis = "MOVE ANALYSIS: " + self._get_move_analysis(possible_moves, obstacles, items, goal_pos)
 
         prompt = f"""You are an intelligent agent that can navigate through a grid-based world.
 Your goal is to collect items, and reach a target goal efficiently. Positions are given in (x, y) coordinates.
@@ -193,7 +193,27 @@ write the number of the final answer with: <move>NUMBER</move>"""
         }
         self.context.append(context_entry)
 
-    def _get_move_analysis(self, possible_moves: List[Tuple[int, int]], obstacles, items, goal_pos):
+    def _get_move_analysis(self,
+                           possible_moves: List[Tuple[int, int]],
+                           obstacles: List[Tuple[int, int]],
+                           items: List[Tuple[int, int]],
+                           goal_pos: Tuple[int, int]) -> str:
+        """
+        Analyze each possible move by examining the surrounding area for strategic information.
+
+        For each move, check a 3-cell radius around the destination position to identify nearby obstacles, items,
+        and the goal.
+
+        Args:
+            possible_moves: List of valid move coordinates the agent can make
+            obstacles: List of obstacle positions on the grid
+            items: List of collectible item positions on the grid
+            goal_pos: Coordinates of the goal position
+
+        Returns:
+            A formatted string containing detailed analysis of each move option,
+            including nearby obstacles, items, and goal proximity information
+        """
         move_info = []
 
         for i, move in enumerate(possible_moves):
@@ -243,7 +263,7 @@ write the number of the final answer with: <move>NUMBER</move>"""
 
         return "\n\n".join(move_info)
 
-    def _get_direction_name(self, dx: int, dy: int):
+    def _get_direction_name(self, dx: int, dy: int) -> str:
         """Convert relative coordinates to direction names"""
         if dx == 0 and dy < 0:
             return "NORTH"
