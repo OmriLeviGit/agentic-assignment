@@ -58,7 +58,8 @@ def select_agent() -> Optional[BaseAgent]:
     print("2️⃣  LLM-Based Agent")
 
     while True:
-        choice: str = input("Select agent (1 -> simple/ 2 -> llm) or 'q' to quit: ").strip().lower()
+        # choice: str = input("Select agent (1 -> simple/ 2 -> llm) or 'q' to quit: ").strip().lower()
+        choice = '2'
         if choice == 'q':
             return None
         elif choice == '1':
@@ -84,7 +85,8 @@ def select_difficulty() -> Optional[str]:
         print()
 
     while True:
-        choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
+        # choice: str = input("Select difficulty (e -> easy/ m -> medium/ h -> hard) or 'q' to quit: ").strip().lower()
+        choice = 'm'
         if choice == 'q':
             return None
         elif choice == 'e':
