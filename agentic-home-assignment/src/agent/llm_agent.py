@@ -24,6 +24,7 @@ class LLMAgent(BaseAgent):
 
         # Agent state
         self.visit_count: Dict[Tuple[int, int], int] = {} # maps visited pos to the number of times visited
+        self.path = []
         self.context: List[Dict[str, Any]] = [] # summary of the previous llm responses
 
     def _setup_llm_with_fallback(self, llm_provider: Optional[LLMInterface]) -> LLMInterface:
@@ -52,7 +53,6 @@ class LLMAgent(BaseAgent):
             print(f"Ollama setup failed: {e}")
             raise RuntimeError("No LLM providers available!")
 
-
     def decide_move(self, possible_moves: List[Tuple[int, int]], grid_info: Dict[str, Any],
                     verbose: bool = False) -> Optional[Tuple[int, int]]:
         """Make a move decision using LLM reasoning."""
@@ -64,84 +64,154 @@ class LLMAgent(BaseAgent):
         curr_pos = grid_info["agent_position"]
         self.visit_count[curr_pos] = self.visit_count.get(curr_pos, 0) + 1
 
-        try:
-            # Build and send prompt
-            prompt = self._create_prompt(grid_info, possible_moves)
-            response = self.llm.query(prompt)
+        agent_pos = grid_info["agent_position"]
+        items = grid_info.get("items_positions", [])
 
-            if verbose:
-                print(f"LLM response:\n{response}\n")
+        # Check for close items within threshold distance
+        close_items = self._get_close_items(agent_pos, items)
 
-            # Parse response
-            move_index, summary = self._parse_llm_response(response)
+        if len(close_items) > 0:
+            try:
+                # Build and send prompt with close items - let LLM decide navigation
+                prompt = self._create_prompt(grid_info, possible_moves, close_items)
+                response = self.llm.query(prompt)
 
-            if move_index is None or not (0 <= move_index < len(possible_moves)):
-                raise ValueError(f"Invalid move index: {move_index}")
+                if verbose:
+                    print(f"LLM response:\n{response}\n")
 
-            # Record decision
-            chosen_move = possible_moves[move_index]
-            self._record_decision(chosen_move, summary)
+                # Parse response
+                move_index, summary = self._parse_llm_response(response)
 
+                if move_index is None or not (0 <= move_index < len(possible_moves)):
+                    raise ValueError(f"Invalid move index: {move_index}")
 
-            return chosen_move
+                # Record decision
+                chosen_move = possible_moves[move_index]
+                self.path.append(chosen_move)
+                self._record_decision(chosen_move, summary)
 
-        except Exception as e:
-            print(f"Error: {e}. Falling back to simple strategy.")
+                return chosen_move
 
-            # Fallback to simple agent
-            fallback_move = self.fallback_agent.decide_move(possible_moves, grid_info)
-            if fallback_move:
-                self._record_decision(fallback_move, "Fallback decision due to error")
+            except Exception as e:
+                print(f"Error: {e}. Falling back to simple strategy.")
 
-            return fallback_move
+        # Fallback to simple agent when no close items or on error
+        fallback_move = self.fallback_agent.decide_move(possible_moves, grid_info)
+        self.path.append(fallback_move)
+        if fallback_move:
+            self._record_decision(fallback_move, "Fallback decision - no close items or error")
 
-    def _create_prompt(self, grid_info: Dict[str, Any], possible_moves: List[Tuple[int, int]]) -> str:
-        """Create the prompt for the LLM."""
+        return fallback_move
+
+    def _create_prompt(self, grid_info: Dict[str, Any], possible_moves: List[Tuple[int, int]],
+                       close_items: List[Tuple[Tuple[int, int], int]]) -> str:
+        """Create the prompt for the LLM with close items information."""
         agent_pos = grid_info["agent_position"]
         goal_pos = grid_info["goal_position"]
         obstacles = grid_info.get("obstacles_positions", [])
-        items = grid_info.get("items_positions", [])
         items_collected = grid_info["items_collected"]
-        items_total = items_collected + len(items)
+
+        # Extract just the positions and distances from close_items
+        close_items_info = [(item[0], item[1]) for item in close_items]
 
         context_str = "PREVIOUSLY CHOSEN MOVES: " + self._get_context_str()
-        possible_moves_str = "YOUR OPTIONS: " + self._get_possible_moves_str(possible_moves)
-        # move_analysis = "MOVE ANALYSIS: " + self._get_move_analysis(possible_moves, obstacles, items, goal_pos)
+        possible_moves_str = "YOUR OPTIONS: " + self._get_possible_moves_str(possible_moves, close_items)
 
-        prompt = f"""You are an intelligent agent that can navigate through a grid-based world.
-Your goal is to collect items, and reach a target goal efficiently. Positions are given in (x, y) coordinates.
-GOAL: Get the highest score by collecting items and reaching the goal efficiently.
-You are scored based on: Goal Reached Bonus + Items Collected percentage + Efficiency Bonus
+        prompt = f"""You are an intelligent agent navigating a grid-based world.
+Your PRIMARY GOAL is to collect nearby items efficiently. The fallback system handles goal navigation.
+
+COORDINATE SYSTEM:
+- (0,0) is at the top-left corner of the grid
+- x increases going RIGHT, y increases going DOWN
+- You can move up/down/left/right to adjacent cells only
+
+MOVEMENT RULES:
+- Any position NOT listed in the obstacles is WALKABLE
+- You can only choose from the provided possible moves
+- All provided moves are guaranteed to be valid and within grid bounds
 
 CURRENT STATE:
 - You are at: {agent_pos}
 - Goal is at: {goal_pos}
-- Items location: {items}
-- Items collected: {items_collected}/{items_total}
-- Obstacles found at: {obstacles}
+- Close items detected: {close_items_info}
+- Obstacle positions: {obstacles}
+- Items collected so far: {items_collected}
 
 {context_str}
+
 {possible_moves_str}
 
-INSTRUCTIONS:
-1. Prioritize collecting items over reaching the goal, especially clusters of items
-2. Collect items when they are accessible with moderate effort
-3. You cannot pass through obstacles, you will need to pass around them
-4. Avoid getting trapped in dead ends, corners, or making excessive backtracking
+ANTI-LOOP STRATEGY:
+⚠️ CRITICAL: Avoid revisiting recent positions to prevent getting stuck in loops!
+- Your recent path: {self.path[-6:] if len(self.path) >= 6 else self.path}
+- NEVER choose moves that go back to positions in your recent path
+- If you see the same positions repeating in your path, you're in a loop
 
-Explain your thought process
-Write a short summary of your decision between <summary> and </summary> tags. The summary must start with "The move (x,y) was chosen because...". If your goal is to aim towards a cluster or avoiding certain cells, mention them.
-write the number of the final answer with: <move>NUMBER</move>"""
+1. **Check for loops FIRST**: Will this move revisit a position from your recent path?
+2. **Trace direct paths**: What sequence of moves would reach each item?
+3. **Check obstacles**: Does any step land on an obstacle coordinate?
+4. **Alternative routes**: Are there non-looping routes to items?
+
+EFFICIENT ITEM COLLECTION STRATEGY:
+🎯 Don't just grab the closest item - plan a smart collection route!
+- Goal direction awareness: Goal is at {goal_pos}
+- Collection order: Start with items FURTHEST from the goal, work toward the goal
+- Avoid zigzagging: Don't collect item near goal, then backtrack to far items
+- Think ahead: Which item should you collect LAST to minimize total travel?
+
+DECISION CRITERIA:
+1. **AVOID LOOPS**: Avoid moves in your recent path
+2. **Explore new areas**: If items unreachable but you can explore new positions → do that
+3. **Fallback**: If a loop is detected, or the current position was visited more than once in recent positions, or all possible moves appear in the recent recent path positions
+
+ESCAPE STRATEGY:
+If you're stuck in a corner or dead end:
+- Look for moves to positions NOT in your recent path
+- Choose moves that lead away from obstacle clusters
+- Prioritize exploration over item collection to escape
+
+<summary>The move (x,y) was chosen because... OR Fallback (-1) was chosen because...</summary>
+
+<move>NUMBER</move> (0-{len(possible_moves) - 1} for moves, or -1 only if ALL moves revisit recent path)"""
 
         return prompt
 
-    def _get_possible_moves_str(self, possible_moves: List[Tuple[int, int]]) -> str:
-        """Format possible moves as a numbered list for LLM selection."""
-        moves_str = ""
+    def _get_close_items(self, agent_pos: Tuple[int, int], items: List[Tuple[int, int]],
+                         max_distance: int = 3) -> List[Tuple[Tuple[int, int], int]]:
+        """Get items within Manhattan distance threshold."""
+        close_items = []
+        for item in items:
+            distance = abs(item[0] - agent_pos[0]) + abs(item[1] - agent_pos[1])
+            if distance <= max_distance:
+                close_items.append((item, distance))
+
+        return close_items
+
+    def _get_possible_moves_str(self, possible_moves: List[Tuple[int, int]],
+                                close_items: List[Tuple[Tuple[int, int], int]]) -> str:
+        """Generate string representation of possible moves with item proximity info."""
+        moves_info = []
+        close_item_positions = {item[0] for item in close_items}
+
         for i, move in enumerate(possible_moves):
-            visit_count = self.visit_count.get(move, 0)
-            moves_str += f"{i + 1}. Move to {move} (visited {visit_count} times)\n"
-        return moves_str
+            move_str = f"{i}: Move to {move}"
+
+            # Check if this move gets us to an item
+            if move in close_item_positions:
+                move_str += " (ITEM HERE!)"
+            else:
+                # Calculate how this move affects distance to close items
+                item_distances = []
+                for item_pos, original_dist in close_items:
+                    new_dist = abs(move[0] - item_pos[0]) + abs(move[1] - item_pos[1])
+                    item_distances.append(f"item{item_pos}:{new_dist}")
+
+                if item_distances:
+                    move_str += f" (distances to items: {', '.join(item_distances)})"
+
+            moves_info.append(move_str)
+
+        return "\n".join(moves_info)
 
     def _get_context_str(self) -> str:
         """Format recent decisions context."""
@@ -168,7 +238,7 @@ write the number of the final answer with: <move>NUMBER</move>"""
         try:
             move_match = re.search(r'<move>(\d+)</move>', text, re.IGNORECASE)
             if move_match:
-                move_index = int(move_match.group(1)) - 1  # Convert to 0-based index
+                move_index = int(move_match.group(1))   # Convert to 0-based index
         except (ValueError, AttributeError):
             pass
 
@@ -192,97 +262,6 @@ write the number of the final answer with: <move>NUMBER</move>"""
             'reasoning': reasoning if reasoning else "No reasoning provided"
         }
         self.context.append(context_entry)
-
-    def _get_move_analysis(self,
-                           possible_moves: List[Tuple[int, int]],
-                           obstacles: List[Tuple[int, int]],
-                           items: List[Tuple[int, int]],
-                           goal_pos: Tuple[int, int]) -> str:
-        """
-        Analyze each possible move by examining the surrounding area for strategic information.
-
-        For each move, check a 3-cell radius around the destination position to identify nearby obstacles, items,
-        and the goal.
-
-        Args:
-            possible_moves: List of valid move coordinates the agent can make
-            obstacles: List of obstacle positions on the grid
-            items: List of collectible item positions on the grid
-            goal_pos: Coordinates of the goal position
-
-        Returns:
-            A formatted string containing detailed analysis of each move option,
-            including nearby obstacles, items, and goal proximity information
-        """
-        move_info = []
-
-        for i, move in enumerate(possible_moves):
-            x, y = move
-
-            nearby_obstacles = []
-            nearby_items = []
-            goal_info = None
-
-            # Check 3-cell radius around this move
-            for dx in range(-3, 4):
-                for dy in range(-3, 4):
-                    if dx == 0 and dy == 0:  # Skip the move position itself
-                        continue
-
-                    check_pos = (x + dx, y + dy)
-
-                    if check_pos in obstacles:
-                        direction = self._get_direction_name(dx, dy)
-                        nearby_obstacles.append(direction)
-
-                    elif check_pos in items:
-                        direction = self._get_direction_name(dx, dy)
-                        distance = abs(dx) + abs(dy)
-                        nearby_items.append(f"{direction} ({distance} steps)")
-
-                    elif check_pos == goal_pos:
-                        direction = self._get_direction_name(dx, dy)
-                        distance = abs(dx) + abs(dy)
-                        goal_info = f"{direction} ({distance} steps)"
-
-            # Build description for this move
-            description = [f"Move {i + 1} to {move}:"]
-
-            if goal_info:
-                description.append(f"  Goal is {goal_info}")
-
-            if nearby_items:
-                description.append(f"  Items: {', '.join(nearby_items)}")
-
-            if nearby_obstacles:
-                description.append(f"  Obstacles: {', '.join(nearby_obstacles)}")
-            else:
-                description.append("  No obstacles nearby - open area")
-
-            move_info.append("\n".join(description))
-
-        return "\n\n".join(move_info)
-
-    def _get_direction_name(self, dx: int, dy: int) -> str:
-        """Convert relative coordinates to direction names"""
-        if dx == 0 and dy < 0:
-            return "NORTH"
-        elif dx == 0 and dy > 0:
-            return "SOUTH"
-        elif dx < 0 and dy == 0:
-            return "WEST"
-        elif dx > 0 and dy == 0:
-            return "EAST"
-        elif dx < 0 and dy < 0:
-            return "NORTHWEST"
-        elif dx > 0 > dy:
-            return "NORTHEAST"
-        elif dx < 0 < dy:
-            return "SOUTHWEST"
-        elif dx > 0 and dy > 0:
-            return "SOUTHEAST"
-        else:
-            return f"({dx},{dy})"
 
     def reset(self) -> None:
         """Reset agent state for a new episode."""
